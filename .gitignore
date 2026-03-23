@@ -42,3 +42,4 @@ htmlcov/
 # Local configuration
 .env
 .python-version
+\n# Project specific\nGemini.md
