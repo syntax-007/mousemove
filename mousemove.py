@@ -19,16 +19,47 @@ RESET = "\033[0m"
 pyautogui.FAILSAFE = False
 
 
-def move_mouse_periodically(interval_seconds):
-    screen_width, screen_height = pyautogui.size()
-    max_x = max(0, screen_width - 10)
-    max_y = max(0, screen_height - 10)
+def compute_bounds(screen_width: int, screen_height: int) -> tuple[int, int]:
+    """Return the max mouse coordinates with a 10px safety margin from screen edges."""
+    return max(0, screen_width - 10), max(0, screen_height - 10)
 
+
+def get_timestamp(timezone: ZoneInfo) -> str:
+    """Return the current time formatted as HH:MM:SS AM/PM in the given timezone."""
+    return datetime.now(timezone).strftime("%I:%M:%S %p")
+
+
+def format_move_log(timestamp: str, start_pos, end_pos) -> str:
+    """Format a single mouse-move log line with ANSI colours."""
+    return (
+        f"[{BLUE}{timestamp}{RESET}] "
+        f"{GREEN}Move:{RESET} "
+        f"(X: {start_pos.x:4}, Y: {start_pos.y:4}) "
+        f"{MAGENTA}→{RESET} "
+        f"(X: {end_pos.x:4}, Y: {end_pos.y:4})"
+    )
+
+
+def print_startup_banner(
+    screen_width: int,
+    screen_height: int,
+    interval_seconds: int,
+    timezone: ZoneInfo,
+) -> None:
+    """Print the startup banner showing screen dimensions, interval, and timezone."""
     print(f"\n{BOLD}{CYAN}--- MOUSEMOVE STARTING ---{RESET}")
     print(f"{BOLD}Screen Size:{RESET} {screen_width}x{screen_height}")
     print(f"{BOLD}Interval:{RESET} {interval_seconds} seconds")
-    print(f"{BOLD}Timezone:{RESET} {TIMEZONE.key}")
+    print(f"{BOLD}Timezone:{RESET} {timezone.key}")
     print(f"{YELLOW}To stop: Press Ctrl+C{RESET}\n")
+
+
+def move_mouse_periodically(interval_seconds: int) -> None:
+    """Move the mouse to a random screen position every interval_seconds seconds."""
+    screen_width, screen_height = pyautogui.size()
+    max_x, max_y = compute_bounds(screen_width, screen_height)
+
+    print_startup_banner(screen_width, screen_height, interval_seconds, TIMEZONE)
 
     try:
         while True:
@@ -36,12 +67,8 @@ def move_mouse_periodically(interval_seconds):
             pyautogui.moveTo(random.randint(0, max_x), random.randint(0, max_y), duration=0.2)
             end_pos = pyautogui.position()
 
-            timestamp = datetime.now(TIMEZONE).strftime("%I:%M:%S %p")
-            print(f"[{BLUE}{timestamp}{RESET}] "
-                  f"{GREEN}Move:{RESET} "
-                  f"(X: {start_pos.x:4}, Y: {start_pos.y:4}) "
-                  f"{MAGENTA}→{RESET} "
-                  f"(X: {end_pos.x:4}, Y: {end_pos.y:4})")
+            timestamp = get_timestamp(TIMEZONE)
+            print(format_move_log(timestamp, start_pos, end_pos))
 
             time.sleep(interval_seconds)
 
