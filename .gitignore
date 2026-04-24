@@ -42,4 +42,10 @@ htmlcov/
 # Local configuration
 .env
 .python-version
-\n# Project specific\nGemini.md
+
+# Project specific
+Gemini.md
+
+# Claude
+CLAUDE.md
+.claude/
