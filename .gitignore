@@ -28,6 +28,9 @@ env/
 .env/
 ENV/
 
+# VS Code
+.vscode/
+
 # PyCharm / IntelliJ
 .idea/
 *.iml
