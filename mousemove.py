@@ -1,86 +1,152 @@
+import argparse
 import pyautogui
 import time
 import random
 from datetime import datetime
+from typing import Any, ClassVar
 from zoneinfo import ZoneInfo
-
-INTERVAL = 103  # seconds between moves (5 minutes)
-TIMEZONE = ZoneInfo("US/Central")
-
-# ANSI Color Codes
-BLUE = "\033[94m"
-GREEN = "\033[92m"
-YELLOW = "\033[93m"
-CYAN = "\033[96m"
-MAGENTA = "\033[95m"
-BOLD = "\033[1m"
-RESET = "\033[0m"
-
-pyautogui.FAILSAFE = False
+from pydantic import BaseModel, Field
 
 
-def compute_bounds(screen_width: int, screen_height: int) -> tuple[int, int]:
-    """Return the max mouse coordinates with a 10px safety margin from screen edges."""
-    return max(0, screen_width - 10), max(0, screen_height - 10)
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
 
 
-def get_timestamp(timezone: ZoneInfo) -> str:
-    """Return the current time formatted as HH:MM:SS AM/PM in the given timezone."""
-    return datetime.now(timezone).strftime("%I:%M:%S %p")
+class Config(BaseModel):
+    interval_seconds: int = 300
+    timezone: ZoneInfo = Field(default_factory=lambda: ZoneInfo("US/Central"))
+    screen_margin: int = 10
+    move_duration: float = 0.2
+
+    model_config = {"arbitrary_types_allowed": True}
 
 
-def format_move_log(timestamp: str, start_pos, end_pos) -> str:
-    """Format a single mouse-move log line with ANSI colours."""
-    return (
-        f"[{BLUE}{timestamp}{RESET}] "
-        f"{GREEN}Move:{RESET} "
-        f"(X: {start_pos.x:4}, Y: {start_pos.y:4}) "
-        f"{MAGENTA}→{RESET} "
-        f"(X: {end_pos.x:4}, Y: {end_pos.y:4})"
-    )
+# ---------------------------------------------------------------------------
+# Mouse abstraction (DIP: isolates pyautogui from the orchestrator)
+# ---------------------------------------------------------------------------
 
 
-def print_startup_banner(
-    screen_width: int,
-    screen_height: int,
-    interval_seconds: int,
-    timezone: ZoneInfo,
-) -> None:
-    """Print the startup banner showing screen dimensions, interval, and timezone."""
-    print(f"\n{BOLD}{CYAN}--- MOUSEMOVE STARTING ---{RESET}")
-    print(f"{BOLD}Screen Size:{RESET} {screen_width}x{screen_height}")
-    minutes, seconds = divmod(interval_seconds, 60)
-    interval_str = f"{minutes} minute{'s' if minutes != 1 else ''}"
-    if seconds:
-        interval_str += f" and {seconds} second{'s' if seconds != 1 else ''}"
-    print(f"{BOLD}Interval:{RESET} {interval_str}")
-    print(f"{BOLD}Timezone:{RESET} {timezone.key}")
-    print(f"{YELLOW}To stop: Press Ctrl+C{RESET}\n")
+class MouseController(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
+    config: Config
+
+    def model_post_init(self, __context: Any) -> None:
+        pyautogui.FAILSAFE = False
+
+    def screen_size(self) -> tuple[int, int]:
+        return pyautogui.size()
+
+    def current_position(self):
+        return pyautogui.position()
+
+    def move_to_random(self, max_x: int, max_y: int) -> None:
+        pyautogui.moveTo(
+            random.randint(0, max_x),
+            random.randint(0, max_y),
+            duration=self.config.move_duration,
+        )
+
+    def compute_bounds(self, screen_width: int, screen_height: int) -> tuple[int, int]:
+        return (
+            max(0, screen_width - self.config.screen_margin),
+            max(0, screen_height - self.config.screen_margin),
+        )
 
 
-def move_mouse_periodically(interval_seconds: int) -> None:
-    """Move the mouse to a random screen position every interval_seconds seconds."""
-    screen_width, screen_height = pyautogui.size()
-    max_x, max_y = compute_bounds(screen_width, screen_height)
+# ---------------------------------------------------------------------------
+# Logger (SRP: all output and formatting concerns in one place)
+# ---------------------------------------------------------------------------
 
-    print_startup_banner(screen_width, screen_height, interval_seconds, TIMEZONE)
 
-    try:
-        while True:
-            start_pos = pyautogui.position()
-            pyautogui.moveTo(
-                random.randint(0, max_x), random.randint(0, max_y), duration=0.2
-            )
-            end_pos = pyautogui.position()
+class Logger(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
 
-            timestamp = get_timestamp(TIMEZONE)
-            print(format_move_log(timestamp, start_pos, end_pos))
+    _BLUE: ClassVar[str] = "\033[94m"
+    _GREEN: ClassVar[str] = "\033[92m"
+    _YELLOW: ClassVar[str] = "\033[93m"
+    _CYAN: ClassVar[str] = "\033[96m"
+    _MAGENTA: ClassVar[str] = "\033[95m"
+    _BOLD: ClassVar[str] = "\033[1m"
+    _RESET: ClassVar[str] = "\033[0m"
 
-            time.sleep(interval_seconds)
+    config: Config
 
-    except KeyboardInterrupt:
-        print(f"\n{YELLOW}Goodbye! Mouse mover stopped.{RESET}")
+    def _timestamp(self) -> str:
+        return datetime.now(self.config.timezone).strftime("%I:%M:%S %p")
 
+    def startup_banner(self, screen_width: int, screen_height: int) -> None:
+        minutes, seconds = divmod(self.config.interval_seconds, 60)
+        interval_str = f"{minutes} minute{'s' if minutes != 1 else ''}"
+        if seconds:
+            interval_str += f" and {seconds} second{'s' if seconds != 1 else ''}"
+        print(f"\n{self._BOLD}{self._CYAN}--- MOUSEMOVE STARTING ---{self._RESET}")
+        print(f"{self._BOLD}Screen Size:{self._RESET} {screen_width}x{screen_height}")
+        print(f"{self._BOLD}Interval:{self._RESET} {interval_str}")
+        print(f"{self._BOLD}Timezone:{self._RESET} {self.config.timezone.key}")
+        print(f"{self._YELLOW}To stop: Press Ctrl+C{self._RESET}\n")
+
+    def move_event(self, start_pos, end_pos) -> None:
+        ts = self._timestamp()
+        print(
+            f"[{self._BLUE}{ts}{self._RESET}] "
+            f"{self._GREEN}Move:{self._RESET} "
+            f"(X: {start_pos.x:4}, Y: {start_pos.y:4}) "
+            f"{self._MAGENTA}→{self._RESET} "
+            f"(X: {end_pos.x:4}, Y: {end_pos.y:4})"
+        )
+
+    def shutdown(self) -> None:
+        print(f"\n{self._YELLOW}Goodbye! Mouse mover stopped.{self._RESET}")
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator (SRP: only the run-loop)
+# ---------------------------------------------------------------------------
+
+
+class MouseMover(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
+    config: Config
+    controller: MouseController
+    logger: Logger
+
+    def run(self) -> None:
+        screen_w, screen_h = self.controller.screen_size()
+        max_x, max_y = self.controller.compute_bounds(screen_w, screen_h)
+        self.logger.startup_banner(screen_w, screen_h)
+
+        try:
+            while True:
+                start_pos = self.controller.current_position()
+                self.controller.move_to_random(max_x, max_y)
+                end_pos = self.controller.current_position()
+                self.logger.move_event(start_pos, end_pos)
+                time.sleep(self.config.interval_seconds)
+        except KeyboardInterrupt:
+            self.logger.shutdown()
+
+
+# ---------------------------------------------------------------------------
+# Entrypoint — composition root
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    move_mouse_periodically(INTERVAL)
+    parser = argparse.ArgumentParser(description="Move the mouse periodically to prevent sleep.")
+    parser.add_argument(
+        "interval",
+        nargs="?",
+        type=int,
+        default=300,
+        metavar="SECONDS",
+        help="Seconds between moves (default: 300)",
+    )
+    args = parser.parse_args()
+    config = Config(interval_seconds=args.interval)
+    MouseMover(
+        config=config,
+        controller=MouseController(config=config),
+        logger=Logger(config=config),
+    ).run()
