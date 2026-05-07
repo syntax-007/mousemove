@@ -4,7 +4,7 @@ import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-INTERVAL = 300  # seconds between moves (5 minutes)
+INTERVAL = 103  # seconds between moves (5 minutes)
 TIMEZONE = ZoneInfo("US/Central")
 
 # ANSI Color Codes
@@ -49,7 +49,11 @@ def print_startup_banner(
     """Print the startup banner showing screen dimensions, interval, and timezone."""
     print(f"\n{BOLD}{CYAN}--- MOUSEMOVE STARTING ---{RESET}")
     print(f"{BOLD}Screen Size:{RESET} {screen_width}x{screen_height}")
-    print(f"{BOLD}Interval:{RESET} {interval_seconds} seconds")
+    minutes, seconds = divmod(interval_seconds, 60)
+    interval_str = f"{minutes} minute{'s' if minutes != 1 else ''}"
+    if seconds:
+        interval_str += f" and {seconds} second{'s' if seconds != 1 else ''}"
+    print(f"{BOLD}Interval:{RESET} {interval_str}")
     print(f"{BOLD}Timezone:{RESET} {timezone.key}")
     print(f"{YELLOW}To stop: Press Ctrl+C{RESET}\n")
 
@@ -64,7 +68,9 @@ def move_mouse_periodically(interval_seconds: int) -> None:
     try:
         while True:
             start_pos = pyautogui.position()
-            pyautogui.moveTo(random.randint(0, max_x), random.randint(0, max_y), duration=0.2)
+            pyautogui.moveTo(
+                random.randint(0, max_x), random.randint(0, max_y), duration=0.2
+            )
             end_pos = pyautogui.position()
 
             timestamp = get_timestamp(TIMEZONE)
@@ -73,7 +79,7 @@ def move_mouse_periodically(interval_seconds: int) -> None:
             time.sleep(interval_seconds)
 
     except KeyboardInterrupt:
-        print(f"\n{YELLOW}Script stopped by user.{RESET}")
+        print(f"\n{YELLOW}Goodbye! Mouse mover stopped.{RESET}")
 
 
 if __name__ == "__main__":
