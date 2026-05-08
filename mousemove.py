@@ -5,6 +5,8 @@ import random
 from datetime import datetime
 from typing import Any, ClassVar
 from zoneinfo import ZoneInfo
+
+from pyautogui import Size
 from pydantic import BaseModel, Field
 
 
@@ -35,10 +37,12 @@ class MouseController(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         pyautogui.FAILSAFE = False
 
-    def screen_size(self) -> tuple[int, int]:
+    @staticmethod
+    def screen_size() -> Size:
         return pyautogui.size()
 
-    def current_position(self):
+    @staticmethod
+    def current_position():
         return pyautogui.position()
 
     def move_to_random(self, max_x: int, max_y: int) -> None:
