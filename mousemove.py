@@ -4,10 +4,9 @@ import time
 import random
 from datetime import datetime
 from typing import Any, ClassVar
-from zoneinfo import ZoneInfo
 
 from pyautogui import Size
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 # ---------------------------------------------------------------------------
@@ -17,11 +16,8 @@ from pydantic import BaseModel, Field
 
 class Config(BaseModel):
     interval_seconds: int = 300
-    timezone: ZoneInfo = Field(default_factory=lambda: ZoneInfo("US/Central"))
     screen_margin: int = 10
     move_duration: float = 0.2
-
-    model_config = {"arbitrary_types_allowed": True}
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +74,7 @@ class Logger(BaseModel):
     config: Config
 
     def _timestamp(self) -> str:
-        return datetime.now(self.config.timezone).strftime("%I:%M:%S %p")
+        return datetime.now().strftime("%I:%M:%S %p")
 
     def startup_banner(self, screen_width: int, screen_height: int) -> None:
         minutes, seconds = divmod(self.config.interval_seconds, 60)
@@ -88,7 +84,6 @@ class Logger(BaseModel):
         print(f"\n{self._BOLD}{self._CYAN}--- MOUSEMOVE STARTING ---{self._RESET}")
         print(f"{self._BOLD}Screen Size:{self._RESET} {screen_width}x{screen_height}")
         print(f"{self._BOLD}Interval:{self._RESET} {interval_str}")
-        print(f"{self._BOLD}Timezone:{self._RESET} {self.config.timezone.key}")
         print(f"{self._YELLOW}To stop: Press Ctrl+C{self._RESET}\n")
 
     def move_event(self, start_pos, end_pos) -> None:
