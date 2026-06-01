@@ -2,6 +2,7 @@ import argparse
 import pyautogui
 import time
 import random
+
 from datetime import datetime
 from typing import Any, ClassVar
 
