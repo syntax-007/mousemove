@@ -31,5 +31,11 @@ pip install -r requirements-dev.txt
 python -m pytest tests/
 ```
 
+Format code with black:
+
+```bash
+black mousemove.py tests/
+```
+
 ## Notes
 - `pyautogui` may require Accessibility permissions on macOS (System Settings → Privacy & Security → Accessibility).
