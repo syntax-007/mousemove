@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 
 from mousemove import Config, MouseController, Logger, MouseMover
 
-
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -50,41 +49,43 @@ def test_compute_bounds_no_margin():
 # ---------------------------------------------------------------------------
 
 
-def _banner_output(interval_seconds: int, capsys) -> str:
+def _banner_output(interval_seconds: int, capsys: pytest.CaptureFixture[str]) -> str:
     config = Config(interval_seconds=interval_seconds)
     Logger(config=config).startup_banner(1920, 1080)
     return capsys.readouterr().out
 
 
-def test_startup_banner_5_minutes(capsys):
+def test_startup_banner_5_minutes(capsys: pytest.CaptureFixture[str]):
     assert "5 minutes" in _banner_output(300, capsys)
 
 
-def test_startup_banner_1_minute_singular(capsys):
+def test_startup_banner_1_minute_singular(capsys: pytest.CaptureFixture[str]):
     out = _banner_output(60, capsys)
     assert "1 minute" in out
     assert "1 minutes" not in out
 
 
-def test_startup_banner_2_minutes_plural(capsys):
+def test_startup_banner_2_minutes_plural(capsys: pytest.CaptureFixture[str]):
     assert "2 minutes" in _banner_output(120, capsys)
 
 
-def test_startup_banner_minutes_and_seconds(capsys):
+def test_startup_banner_minutes_and_seconds(capsys: pytest.CaptureFixture[str]):
     assert "1 minute and 30 seconds" in _banner_output(90, capsys)
 
 
-def test_startup_banner_1_second_singular(capsys):
+def test_startup_banner_1_second_singular(capsys: pytest.CaptureFixture[str]):
     out = _banner_output(61, capsys)
     assert "1 minute and 1 second" in out
     assert "1 seconds" not in out
 
 
-def test_startup_banner_plural_minutes_and_plural_seconds(capsys):
+def test_startup_banner_plural_minutes_and_plural_seconds(
+    capsys: pytest.CaptureFixture[str],
+):
     assert "2 minutes and 45 seconds" in _banner_output(165, capsys)
 
 
-def test_startup_banner_includes_screen_size(capsys):
+def test_startup_banner_includes_screen_size(capsys: pytest.CaptureFixture[str]):
     out = _banner_output(300, capsys)
     assert "1920x1080" in out
 
@@ -99,7 +100,9 @@ def test_startup_banner_includes_screen_size(capsys):
 # ---------------------------------------------------------------------------
 
 
-def test_move_event_prints_start_and_end_coordinates(capsys):
+def test_move_event_prints_start_and_end_coordinates(
+    capsys: pytest.CaptureFixture[str],
+):
     logger = Logger(config=Config())
     start = MagicMock(x=100, y=200)
     end = MagicMock(x=300, y=400)
@@ -111,7 +114,7 @@ def test_move_event_prints_start_and_end_coordinates(capsys):
     assert "400" in out
 
 
-def test_shutdown_prints_goodbye(capsys):
+def test_shutdown_prints_goodbye(capsys: pytest.CaptureFixture[str]):
     Logger(config=Config()).shutdown()
     assert "Goodbye" in capsys.readouterr().out
 
@@ -147,30 +150,36 @@ def test_move_to_random_calls_moveto_with_randint_coords_and_duration():
 # ---------------------------------------------------------------------------
 
 
-def _make_mover(config=None):
+def _make_mover(
+    config: Config | None = None,
+) -> tuple[MouseMover, MagicMock, MagicMock]:
     config = config or Config()
     controller = MagicMock(spec=MouseController)
     controller.screen_size.return_value = (1920, 1080)
     controller.compute_bounds.return_value = (1910, 1070)
     logger = MagicMock(spec=Logger)
-    return MouseMover(config=config, controller=controller, logger=logger)
+    return (
+        MouseMover(config=config, controller=controller, logger=logger),
+        controller,
+        logger,
+    )
 
 
 def test_run_calls_startup_banner_once():
-    mover = _make_mover()
-    mover.controller.current_position.side_effect = [
+    mover, controller, logger = _make_mover()
+    controller.current_position.side_effect = [
         MagicMock(x=100, y=200),
         MagicMock(x=300, y=400),
         KeyboardInterrupt,
     ]
     with patch("mousemove.time.sleep"):
         mover.run()
-    mover.logger.startup_banner.assert_called_once_with(1920, 1080)
+    logger.startup_banner.assert_called_once_with(1920, 1080)
 
 
 def test_run_moves_mouse_each_iteration():
-    mover = _make_mover()
-    mover.controller.current_position.side_effect = [
+    mover, controller, _ = _make_mover()
+    controller.current_position.side_effect = [
         MagicMock(x=0, y=0),
         MagicMock(x=500, y=500),
         MagicMock(x=0, y=0),
@@ -179,12 +188,12 @@ def test_run_moves_mouse_each_iteration():
     ]
     with patch("mousemove.time.sleep"):
         mover.run()
-    assert mover.controller.move_to_random.call_count == 2
+    assert controller.move_to_random.call_count == 2
 
 
 def test_run_logs_move_event_each_iteration():
-    mover = _make_mover()
-    mover.controller.current_position.side_effect = [
+    mover, controller, logger = _make_mover()
+    controller.current_position.side_effect = [
         MagicMock(x=0, y=0),
         MagicMock(x=500, y=500),
         MagicMock(x=0, y=0),
@@ -193,13 +202,13 @@ def test_run_logs_move_event_each_iteration():
     ]
     with patch("mousemove.time.sleep"):
         mover.run()
-    assert mover.logger.move_event.call_count == 2
+    assert logger.move_event.call_count == 2
 
 
 def test_run_sleeps_for_configured_interval():
     config = Config(interval_seconds=42)
-    mover = _make_mover(config)
-    mover.controller.current_position.side_effect = [
+    mover, controller, _ = _make_mover(config)
+    controller.current_position.side_effect = [
         MagicMock(x=0, y=0),
         MagicMock(x=100, y=100),
         KeyboardInterrupt,
@@ -210,20 +219,20 @@ def test_run_sleeps_for_configured_interval():
 
 
 def test_run_calls_shutdown_on_keyboard_interrupt():
-    mover = _make_mover()
-    mover.controller.current_position.side_effect = KeyboardInterrupt
+    mover, controller, logger = _make_mover()
+    controller.current_position.side_effect = KeyboardInterrupt
     with patch("mousemove.time.sleep"):
         mover.run()
-    mover.logger.shutdown.assert_called_once()
+    logger.shutdown.assert_called_once()
 
 
 def test_run_uses_computed_bounds_for_moves():
-    mover = _make_mover()
-    mover.controller.current_position.side_effect = [
+    mover, controller, _ = _make_mover()
+    controller.current_position.side_effect = [
         MagicMock(x=0, y=0),
         MagicMock(x=100, y=100),
         KeyboardInterrupt,
     ]
     with patch("mousemove.time.sleep"):
         mover.run()
-    mover.controller.move_to_random.assert_called_once_with(1910, 1070)
+    controller.move_to_random.assert_called_once_with(1910, 1070)

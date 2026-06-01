@@ -8,7 +8,6 @@ from typing import Any, ClassVar
 from pyautogui import Size
 from pydantic import BaseModel
 
-
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -133,7 +132,9 @@ class MouseMover(BaseModel):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Move the mouse periodically to prevent sleep.")
+    parser = argparse.ArgumentParser(
+        description="Move the mouse periodically to prevent sleep."
+    )
     parser.add_argument(
         "interval",
         nargs="?",
