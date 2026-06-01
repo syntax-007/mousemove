@@ -86,7 +86,7 @@ class Logger(BaseModel):
         print(f"{self._BOLD}Interval:{self._RESET} {interval_str}")
         print(f"{self._YELLOW}To stop: Press Ctrl+C{self._RESET}\n")
 
-    def move_event(self, start_pos, end_pos) -> None:
+    def move_event(self, start_pos: pyautogui.Point, end_pos: pyautogui.Point) -> None:
         ts = self._timestamp()
         print(
             f"[{self._BLUE}{ts}{self._RESET}] "
